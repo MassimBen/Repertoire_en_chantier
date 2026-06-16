@@ -7,7 +7,7 @@ resource "google_storage_bucket" "data-lake" {
   location      = var.location
   force_destroy = true
 
-  # AJOUTE CES DEUX LIGNES POUR RESPECTER LA SÉCURITÉ DE GCP
+  #  Ajout de ces deux lignes pour respecter la sécurité de GCP 
   public_access_prevention    = "enforced"
   uniform_bucket_level_access = true
 
