@@ -16,7 +16,7 @@ Voici le projet mis à jour avec dbt initialisé dans un dossier et connecté di
 
 ## 💡 Pitch recruteur
 
-> « J'ai construit un pipeline ELT reproductible sur des jeux de données publics de l'Assurance Maladie. Bruin gère l'ingestion et l'orchestration ; dbt transforme les données dans BigQuery, construit les modèles analytiques et exécute les tests. J'ai documenté les millésimes, les codes géographiques et les règles de confidentialité propres aux sources — la comorbidité via API, les professionnels de santé et les dépenses de soins en CSV — puis exposé les indicateurs dans un dashboard Looker Studio. »
+> « J'ai construit un pipeline ELT reproductible sur des jeux de données publics de l'Assurance Maladie. Bruin gère l'ingestion et l'orchestration ; dbt transforme les données dans BigQuery, construit les modèles analytiques et exécute les tests. J'ai documenté les millésimes, les codes géographiques et les règles de confidentialité propres aux sources — la comorbidité, les professionnels de santé et les dépenses de soins via API — puis exposé les indicateurs dans un dashboard Looker Studio. »
 
 ---
 
