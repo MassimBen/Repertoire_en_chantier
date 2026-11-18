@@ -391,224 +391,173 @@ cd ../cnam_dbt && dbt build --target prod
 
 ---
 
+# 🏥 Projet principal — Synthea avec Kestra, Dataproc et dbt Fusion
 
-# 📋 NOTE 2 — PROJET PRINCIPAL  
-## 🏥 Synthea Health Data Pipeline — Bruin, Dataproc Serverless, PySpark et BigQuery
+**Repo :** `DEHUB/01-synthea-kestra-dataproc-dbt/`  
+**Période :** octobre–novembre 2026  
+**Stack :** Kestra, Dataproc Serverless, PySpark, Google Cloud Storage, BigQuery, dbt Fusion
 
-📂 **Repo :** `DEHUB/01-synthea-bruin-gcp-pipeline/`  
-🎯 **Quand :** octobre–novembre 2026  
-💡 **Objectif :** construire un pipeline de données de santé synthétiques sur GCP, orchestré avec Bruin, transformé avec PySpark sur Dataproc Serverless, puis modélisé dans BigQuery.
+## 🎯 Objectif
 
-### 💡 Pitch recruteur
-
-> « J’ai construit un pipeline de données synthétiques générées par Synthea, orchestré avec Bruin. Les traitements distribués sont écrits en PySpark et exécutés sur Dataproc Serverless. Les données préparées et les modèles analytiques sont stockés dans BigQuery. Le pipeline inclut des dépendances, des contrôles de qualité, une historisation SCD2 et une configuration IAM documentée. Les données utilisées sont exclusivement synthétiques. »
-
-## 🏗️ Architecture
+Construire un pipeline de données de santé de bout en bout à partir des données synthétiques Synthea. Kestra orchestre les étapes, Dataproc exécute les traitements PySpark, GCS conserve les fichiers et BigQuery héberge les tables analytiques. dbt Fusion, installé et exécuté localement, construit les modèles SQL dans BigQuery et teste leur qualité.
 
 ```text
-Synthea
-  → fichiers CSV ou FHIR synthétiques
-        │
-        ▼
-Cloud Storage — zone raw
-        │
-        ▼
-Bruin — assets, dépendances, qualité et orchestration
-        │
-        ▼
-Dataproc Serverless — exécution des traitements PySpark
-        │
-        ├──→ Cloud Storage — fichiers préparés, par exemple en Parquet
-        │
-        ▼
-BigQuery — staging, core et marts
-        │
-        ▼
-Requêtes BigQuery ou Looker Studio
-        ⚠️ Mention visible : « Données synthétiques »
+Données synthétiques Synthea
+      ↓
+Google Cloud Storage — fichiers bruts
+      ↓
+Kestra — orchestration
+      ↓
+Dataproc Serverless — jobs PySpark
+      ↓
+Google Cloud Storage — données nettoyées en Parquet
+      ↓
+BigQuery — tables de staging
+      ↓
+dbt Fusion exécuté en local — modèles SQL et tests
+      ↓
+BigQuery — tables analytiques
 ```
 
-- **Bruin** organise le pipeline et peut exécuter les assets SQL BigQuery. Il remplace Dataform dans cette version du projet.
-- **Dataproc Serverless** fournit le moteur Spark sans cluster persistant à administrer.
-- **PySpark** réalise les traitements distribués : parsing, typage, nettoyage et déduplication.
-- **BigQuery** héberge les données préparées et les tables analytiques.
+## 📥 Récupérer les données Synthea
 
-**À décider et tester tôt :** le contrat de sortie de PySpark — par exemple Parquet sur GCS puis chargement ou lecture dans BigQuery. Ne présume pas que Spark écrit automatiquement dans BigQuery : valide le connecteur, le runtime et les permissions du compte de service.
+Synthea est un générateur de dossiers médicaux synthétiques. Pour ce projet, le plus simple est de télécharger un **jeu d’exemple au format CSV**, puis d’envoyer les fichiers dans ton bucket GCS.
 
-**Dataform est optionnel.** Pour éviter deux outils qui orchestrent ou gèrent les mêmes tables, utilise Bruin seul dans la version principale. Tu peux ajouter Dataform plus tard si tu veux comparer les approches.
+- **Page officielle des téléchargements Synthea :** [synthetichealth.github.io/downloads](https://synthetichealth.github.io/downloads.html)
+- **Page officielle Synthea et jeux d’exemple :** [synthetichealth.github.io/synthea](https://synthetichealth.github.io/synthea/)
+- **Code source et instructions pour générer tes propres données :** [github.com/synthetichealth/synthea](https://github.com/synthetichealth/synthea)
 
-## 🔄 Étapes et livrables
+La page des téléchargements propose des jeux d’exemple et des archives de plus grande taille. Pour commencer, prends le jeu **CSV d’exemple** plutôt qu’une grosse archive : il sera plus rapide à téléverser et à traiter pendant le développement. Synthea propose aussi des formats FHIR, mais le CSV est le plus simple pour ce pipeline PySpark–BigQuery. ([synthetichealth.github.io](https://synthetichealth.github.io/synthea/?trk=public_post_comment-text&utm_source=openai))
 
-| Étape | Outil | Livrable |
+### Quels fichiers récupérer ?
+
+Pour les analyses prévues, commence avec ces fichiers CSV :
+
+| Fichier | Contenu | Utilisation dans le projet |
 |---|---|---|
-| 1. Génération | Synthea | Export synthétique reproductible et schémas inventoriés |
-| 2. Stockage source | Cloud Storage | Fichiers organisés sous `raw/` |
-| 3. Définition du pipeline | Bruin | Assets, dépendances et configuration validés |
-| 4. Traitement distribué | Dataproc Serverless + PySpark | Données nettoyées et contrat de sortie documenté |
-| 5. Modélisation | Bruin + BigQuery SQL | Tables staging, core et marts |
-| 6. Historisation | Bruin + BigQuery SQL, ou PySpark si justifié | SCD2 démontrée et testée |
-| 7. Qualité et orchestration | Bruin, Cloud Logging | Contrôles, journaux et exécutions documentés |
-| 8. Restitution | BigQuery / Looker Studio | Requêtes ou dashboard indiquant « données synthétiques » |
+| `patients.csv` | Identité synthétique, naissance, décès éventuel, sexe, adresse et données démographiques | Dimension patients, répartition par âge ou région |
+| `encounters.csv` | Rencontres médicales : dates, type, patient, établissement et coûts selon les champs présents | Faits de rencontres par période |
+| `conditions.csv` | Conditions ou problèmes de santé associés aux patients et aux rencontres | Principales conditions par groupe démographique |
 
-Bruin documente un asset `dataproc_serverless.pyspark` pour exécuter du PySpark sur Dataproc Serverless, ainsi que des assets SQL BigQuery. La connexion Dataproc et son espace de travail GCS sont à configurer selon la documentation et ton environnement GCP.
+Tu peux ensuite ajouter :
 
-## 📁 Structure du repo
+| Fichier | Contenu | Utilisation possible |
+|---|---|---|
+| `observations.csv` | Mesures et résultats observés, par exemple certaines valeurs cliniques | Analyses de mesures et indicateurs cliniques |
+| `medications.csv` | Médicaments associés aux patients ou aux rencontres | Analyses de prescriptions |
+| `procedures.csv` | Procédures réalisées | Activité médicale |
+| `organizations.csv` | Organisations ou établissements | Analyses par établissement |
+| `providers.csv` | Professionnels de santé | Analyses par professionnel |
+
+Les exports Synthea contiennent des données cliniques comme les patients, les rencontres, les conditions, les médicaments et les observations. Les fichiers disponibles et leurs champs peuvent dépendre du jeu téléchargé ou de la configuration utilisée pour générer les données. Vérifie donc les en-têtes des CSV avant de figer ton schéma BigQuery. ([github.com](https://github.com/synthetichealth/synthea?utm_source=openai))
+
+**Recommandation pour une première version :** utilise `patients.csv`, `encounters.csv` et `conditions.csv`. Ce trio permet de réaliser les analyses principales sans alourdir inutilement le projet.
+
+Exemple d’organisation locale avant l’envoi vers GCS :
 
 ```text
-01-synthea-bruin-gcp-pipeline/
-├── README.md
-├── LEARNINGS.md
-├── pipeline.yml
-├── pyproject.toml
-├── synthea/
-│   ├── config/
-│   └── generate.sh
-├── pipelines/
-│   └── synthea/
-│       ├── pipeline.yml
-│       └── assets/
-│           ├── spark/
-│           │   └── normalize_patients.py
-│           ├── bigquery/
-│           │   ├── staging/
-│           │   │   └── patients.sql
-│           │   ├── core/
-│           │   │   └── dim_patient.sql
-│           │   └── marts/
-│           │       └── patient_summary.sql
-│           └── quality/
+data/
+└── synthea/
+    ├── patients.csv
+    ├── encounters.csv
+    ├── conditions.csv
+    ├── observations.csv
+    └── medications.csv
+```
+
+Puis, organise les fichiers dans GCS par étape :
+
+```text
+gs://<bucket-synthea>/raw/patients/patients.csv
+gs://<bucket-synthea>/raw/encounters/encounters.csv
+gs://<bucket-synthea>/raw/conditions/conditions.csv
+```
+
+Si tu veux maîtriser la taille du jeu et pouvoir le régénérer, tu peux aussi **générer les données toi-même** avec Synthea. Le projet permet de définir une population et une graine aléatoire, et propose l’export CSV, qui doit être activé dans la configuration si nécessaire. ([github.com](https://github.com/synthetichealth/synthea?utm_source=openai))
+
+> Les données Synthea sont synthétiques : ce ne sont pas des dossiers de vrais patients. Cela en fait un choix adapté à un projet de démonstration, mais elles ne remplacent pas des données cliniques réelles pour tirer des conclusions médicales. ([github.com](https://github.com/synthetichealth/synthea?utm_source=openai))
+
+## 🧰 Rôle des composants
+
+**Kestra :** orchestre les tâches, leurs dépendances, les reprises et le suivi des exécutions. Il lance les jobs Dataproc, les chargements BigQuery et, si tu automatises cette partie, les commandes dbt.
+
+**Docker Compose :** lance Kestra localement pour le développement. Spark n’est pas hébergé dans les conteneurs Docker : les jobs PySpark s’exécutent sur Dataproc.
+
+**Dataproc Serverless + PySpark :** nettoie et prépare les CSV Synthea, puis écrit les résultats en Parquet dans GCS.
+
+**Google Cloud Storage :** stocke les fichiers bruts et les résultats préparés.
+
+**BigQuery :** accueille les tables de staging chargées depuis GCS, puis les modèles analytiques créés par dbt.
+
+**dbt Fusion :** s’exécute **en local**, depuis ton environnement de développement. Il se connecte à BigQuery pour y exécuter les modèles SQL et les tests.
+
+> **À retenir :** dbt Fusion ne s’exécutera pas automatiquement sur ton ordinateur simplement parce que Kestra a terminé les jobs Dataproc. Pour cette première version, tu peux exécuter le flow Kestra, puis lancer dbt Fusion localement. L’automatisation complète pourra être ajoutée ensuite en faisant exécuter dbt par Kestra dans un environnement approprié.
+
+## 📁 Organisation du dépôt
+
+```text
+01-synthea-kestra-dataproc-dbt/
+├── docker-compose.yml
+├── kestra/
+│   └── flows/
+│       └── synthea_pipeline.yml
+├── spark/
+│   └── jobs/
+│       ├── clean_patients.py
+│       ├── prepare_encounters.py
+│       └── prepare_conditions.py
+├── dbt/
+│   ├── dbt_project.yml
+│   ├── models/
+│   │   ├── staging/
+│   │   │   ├── stg_patients.sql
+│   │   │   ├── stg_encounters.sql
+│   │   │   └── stg_conditions.sql
+│   │   └── marts/
+│   │       ├── dim_patients.sql
+│   │       ├── fact_encounters.sql
+│   │       └── condition_indicators.sql
+│   ├── tests/
+│   └── README.md
 ├── tests/
-│   └── fixtures/
-└── docs/
-    ├── architecture.md
-    ├── data_dictionary.md
-    └── cost_and_security.md
+├── README.md
+└── .env.example
 ```
 
-## 🧩 Exemples d’assets Bruin
+Les identifiants et secrets de connexion ne doivent pas être versionnés. Ajoute la configuration locale dbt contenant des secrets au `.gitignore`, et fournis un fichier d’exemple sans identifiants sensibles.
 
-Les exemples illustrent la forme générale ; les noms de connexions, projet, région, buckets et tables sont à adapter à GCP.
+## 🔄 Étapes du pipeline
 
-**Asset PySpark Dataproc Serverless** — les métadonnées Bruin sont intégrées au fichier Python :
+1. Télécharger le jeu Synthea au format CSV depuis la page officielle, ou générer les données avec le dépôt Synthea.
+2. Sélectionner les fichiers `patients.csv`, `encounters.csv` et `conditions.csv` pour la première version.
+3. Vérifier les en-têtes, le format et la présence des fichiers.
+4. Déposer les CSV dans le dossier `raw/` du bucket GCS.
+5. Lancer depuis Kestra les jobs PySpark sur Dataproc Serverless.
+6. Nettoyer les données : types, valeurs manquantes, doublons et règles de qualité.
+7. Écrire les résultats préparés en Parquet dans `gs://<bucket>/curated/`.
+8. Charger les fichiers préparés dans des tables de staging BigQuery.
+9. Exécuter localement dbt Fusion pour construire les modèles analytiques dans BigQuery.
+10. Lancer les tests dbt et consulter les résultats, les logs et les états d’exécution.
 
-```python
-""" @bruin
-name: spark.normalize_patients
-type: dataproc_serverless.pyspark
-connection: dataproc_serverless-default
-depends:
-  - synthea.raw_patients
-timeout: 1h
-@bruin """
+## 📈 Analyses à présenter
 
-# Traitement PySpark.
-# Définir explicitement les sources, le schéma et la destination.
-```
+- Nombre de patients par tranche d’âge ou région.
+- Nombre de rencontres médicales par période.
+- Principales conditions médicales par groupe démographique.
+- Contrôles de qualité : doublons, champs manquants et volumes traités.
+- Tests dbt sur les clés uniques, les valeurs non nulles et les relations entre modèles.
 
-**Asset SQL BigQuery** — SQL et métadonnées Bruin dans le même fichier :
+## ✅ Livrables portfolio
 
-```sql
-/* @bruin
-name: staging.patients
-type: bq.sql
-depends:
-  - spark.normalize_patients
-materialization:
-  type: table
-columns:
-  - name: patient_id
-    type: string
-    checks:
-      - name: not_null
-      - name: unique
-@bruin */
+- Un dépôt Git contenant les flows Kestra, les scripts PySpark et le projet dbt.
+- Un `docker-compose.yml` permettant de lancer Kestra localement.
+- Un README contenant les liens vers Synthea, les fichiers sélectionnés, l’architecture et les instructions.
+- Un schéma du pipeline et des captures des exécutions Kestra.
+- Des résultats de tests dbt et des exemples de requêtes ou un tableau de bord BigQuery.
+- Une description claire des choix d’exécution : données Synthea en CSV, PySpark sur Dataproc et dbt Fusion lancé localement.
 
-SELECT
-  patient_id,
-  birth_date,
-  gender
-FROM `mon_projet.raw_synthea.patients`
-```
+## 📌 Positionnement du projet
 
-La connexion Dataproc, les credentials et l’espace de travail GCS se configurent séparément. **Ne mets pas de clés de service dans Git.** Bruin peut être utilisé localement pour développer ; pour une exécution planifiée, prévois un déploiement dans Bruin Cloud ou un ordonnanceur externe/CI configuré pour lancer le pipeline.
+Tu montres que tu sais combiner orchestration, calcul distribué avec PySpark, stockage cloud, entrepôt BigQuery et transformations analytiques avec dbt Fusion.
 
-## 🌟 Point fort : SCD Type 2
-
-Colonnes possibles :
-
-- `patient_id`
-- attributs historisés, par exemple `address`
-- `valid_from`
-- `valid_to`
-- `is_current`
-
-Règles à tester :
-
-1. Une seule version courante par patient.
-2. Si les attributs suivis ne changent pas, ne pas créer de nouvelle version.
-3. Si un attribut change, fermer l’ancienne version et insérer la nouvelle.
-4. Rendre les exécutions rejouables sans créer de versions en double.
-5. Ne traiter une absence comme une suppression que si la source permet réellement de détecter les suppressions.
-
-**Livrable :** une requête montrant deux versions d’un patient, avec leurs dates de validité. La logique peut être en SQL BigQuery orchestré par Bruin ; ne la mets en PySpark que si cela sert l’objectif d’apprentissage.
-
-## 🧪 Contrôles de qualité
-
-- Identifiants requis non nuls et uniques selon les règles du modèle.
-- Dates valides et cohérentes.
-- Chaque encounter référence un patient existant.
-- Coûts positifs ou nuls, si ces champs existent dans l’export.
-- Au plus une version SCD2 courante par clé et absence de périodes incohérentes.
-- Nombres de lignes, doublons et rejets mesurés à chaque étape.
-
-Inventorie les fichiers produits par ta version de Synthea : tous les exports ne sont pas nécessairement générés par défaut.
-
-## 🗺️ Plan de travail
-
-**Semaine 1 — Données et fondations**  
-Configurer Synthea, inventorier les fichiers, créer les ressources GCS et BigQuery. Définir IAM, région et schémas.
-
-**Semaine 2 — Bruin et PySpark**  
-Créer le pipeline Bruin, configurer la connexion Dataproc Serverless et tester un petit job PySpark de bout en bout.
-
-**Semaine 3 — BigQuery et SCD2**  
-Créer les assets SQL de staging/core/marts, ajouter les contrôles et tester l’historisation ainsi que le rejeu.
-
-**Semaine 4 — Orchestration et présentation**  
-Documenter le déploiement planifié, vérifier les journaux, faire un run complet et préparer le README et le pitch.
-
-## ✅ Checklist de fin
-
-- ☐ Données Synthea identifiées comme synthétiques ; configuration et version documentées.
-- ☐ Fichiers source déposés dans Cloud Storage et schémas inventoriés.
-- ☐ Asset Bruin PySpark exécuté sur Dataproc Serverless.
-- ☐ Sortie PySpark vers GCS ou BigQuery définie et testée.
-- ☐ Assets SQL BigQuery Bruin avec dépendances explicites.
-- ☐ Qualité des données et SCD2 testées, y compris lors d’un rejeu.
-- ☐ Journaux et erreurs consultables.
-- ☐ IAM au moindre privilège ; secrets exclus du dépôt.
-- ☐ Exécution planifiée ou procédure d’exécution documentée.
-- ☐ Coûts surveillés et ressources d’essai supprimables.
-- ☐ README et dashboard affichent « données synthétiques ».
-- ☐ `LEARNINGS.md` contient au moins cinq problèmes rencontrés et solutions.
-
-## 💸 Coûts et sécurité
-
-Dataproc Serverless facture les ressources consommées ; BigQuery, GCS et le réseau peuvent également engendrer des coûts. Le total dépend de la région, du volume, de la durée des jobs, du shuffle et des requêtes : vérifie les tarifs GCP applicables avant les essais.
-
-Pour limiter les coûts : commence avec peu de données, évite les backfills inutiles, contrôle les requêtes BigQuery, supprime les ressources de démonstration inutilisées et configure des alertes de budget.
-
-Utilise uniquement des données synthétiques, sépare les identités de soumission et d’exécution lorsque nécessaire, applique le moindre privilège et ne stocke aucun secret dans Git.
-
-## 📚 Ressources
-
-- Bruin — [Dataproc Serverless](https://getbruin.com/docs/bruin/platforms/dataproc_serverless.html)
-- Bruin — [BigQuery](https://getbruin.com/docs/bruin/platforms/bigquery.html)
-- Bruin — [définition des assets](https://getbruin.com/docs/bruin/assets/definition-schema.html)
-- Google Cloud — [Dataproc Serverless](https://docs.cloud.google.com/managed-spark/docs/serverless-overview)
-- Google Cloud — [batch PySpark](https://docs.cloud.google.com/sdk/gcloud/reference/dataproc/batches/submit/pyspark)
-- Google Cloud — [tarifs Dataproc Serverless](https://cloud.google.com/dataproc-serverless/pricing)
-- Google Cloud — [tarifs BigQuery](https://cloud.google.com/bigquery/pricing)
-- Synthea — [site officiel](https://synthetichealth.github.io/synthea/)
-
-**Règle d’or :** Bruin orchestre et organise les assets ; PySpark traite les données distribuées ; Dataproc fournit le calcul Spark ; BigQuery héberge les tables analytiques.
+**Docker sert à lancer Kestra en local.** Dataproc est le service cloud qui exécute Spark. **dbt Fusion reste local** dans cette version, mais transforme les données directement dans BigQuery. Pour démarrer simplement, télécharge les CSV Synthea et utilise `patients.csv`, `encounters.csv` et `conditions.csv`.
