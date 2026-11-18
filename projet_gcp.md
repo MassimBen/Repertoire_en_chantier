@@ -1,393 +1,233 @@
-Tu as raison de demander une vérification : **le premier projet proposé est cohérent avec le parcours Google Cloud, mais il ne couvre pas à lui seul tout le programme Data Engineer**. Il correspond bien à la partie *batch* : le cours officiel « Building Batch Data Pipelines on Google Cloud » aborde notamment BigQuery, Spark sur Dataproc et le traitement serverless avec Dataflow. Le parcours comporte aussi un volet distinct sur les pipelines streaming et Dataflow. ([cloud.google.com](https://cloud.google.com/blog/topics/training-certifications/google-clouds-data-engineering-learning-path-is-now-updated?utm_source=openai))
-
-Je corrige donc les projets pour qu’ils se complètent clairement : **le projet 1 est un pipeline batch Synthea avec Dataproc Serverless** ; **le projet 2 est un pipeline streaming avec Pub/Sub et Dataflow**. J’ajuste également un point d’architecture : dans le premier projet, Kestra orchestre les étapes, mais dbt Fusion reste lancé localement au départ — ce n’est pas une exécution automatique par Kestra.
-
 # VERSION COMPLÈTE
 
-# 📋 PROJET 1 — PIPELINE BATCH SYNTHEA
+Les deux projets ci-dessous sont séparés par **batch** et **streaming**, comme les cours Google Cloud prévus dans ton programme. Le parcours Data Engineer répertorie notamment *Building Batch Data Pipelines on Google Cloud*, *Building Resilient Streaming Analytics Systems on Google Cloud* et *Serverless Data Processing with Dataflow*. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?authuser=117&utm_source=openai))
 
-## 🏥 Synthea Batch Pipeline — Kestra, Dataproc Serverless, PySpark, GCS, BigQuery et dbt Fusion
+**À noter :** Dataproc, Dataflow, BigQuery et GCS sont les services Google Cloud au cœur des projets. **Kestra et dbt Fusion sont des extensions personnelles** : utiles pour ton portfolio, mais à ne pas présenter comme des outils enseignés par les cours eux-mêmes.
+
+---
+
+# 📋 PROJET 1 — PIPELINE BATCH
+
+## 🏥 Synthea Batch Pipeline — Dataproc, PySpark, GCS et BigQuery
 
 | | |
 |:---|:---|
 | **📂 Repo** | `DEHUB/01-synthea-gcp-batch-pipeline/` |
 | **☁️ Projet GCP** | `note` — ton projet Google Cloud principal |
-| **🎯 Objectif** | Construire un pipeline batch reproductible à partir de fichiers CSV de santé synthétiques Synthea |
-| **🧰 Technologies** | Kestra, Dataproc Serverless, PySpark, Google Cloud Storage, BigQuery, dbt Fusion local |
-
----
+| **🎯 Objectif** | Construire un pipeline batch reproductible de traitement et d’analyse de données synthétiques |
+| **🧰 Technologies principales** | Google Cloud Storage, Dataproc Serverless, PySpark et BigQuery |
+| **🧰 Extensions portfolio** | Kestra pour l’orchestration ; dbt Fusion exécuté localement pour les modèles SQL et les tests |
 
 ## 💡 Pitch recruteur
 
-> « J’ai construit un pipeline batch de bout en bout à partir des données synthétiques Synthea. Kestra orchestre les étapes, Dataproc Serverless exécute les traitements PySpark, et Google Cloud Storage stocke les fichiers bruts et préparés. Les résultats sont chargés dans BigQuery, où dbt Fusion, exécuté localement, construit les modèles analytiques et teste leur qualité. »
+> « J’ai construit un pipeline batch à partir des données synthétiques Synthea. Les fichiers bruts sont stockés dans Cloud Storage, puis traités avec PySpark sur Dataproc Serverless. Les données préparées sont chargées dans BigQuery pour les analyses. J’ai ajouté Kestra pour orchestrer les étapes et dbt Fusion, exécuté localement, pour créer et tester les modèles analytiques. »
 
----
+## 🎓 Lien avec le parcours Data Engineer
 
-## 🧭 Architecture sur GCP (`note`)
+Ce projet met principalement en pratique les thèmes du cours **Building Batch Data Pipelines on Google Cloud** : choix d’un schéma batch, traitement avec Spark sur Dataproc et utilisation de BigQuery. Le parcours Google Cloud mentionne Spark sur Dataproc parmi les technologies abordées dans ce cours. ([cloud.google.com](https://cloud.google.com/blog/topics/training-certifications/google-clouds-data-engineering-learning-path-is-now-updated?utm_source=openai))
+
+Les cours d’introduction et de modernisation des data lakes et data warehouses apportent le contexte pour concevoir les zones de stockage GCS et l’entrepôt BigQuery. Le lab **Build a Data Warehouse with BigQuery** peut compléter la partie modélisation et analyse. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?authuser=117&utm_source=openai))
+
+**Kestra et dbt Fusion ne sont pas requis pour démontrer ces objectifs de cours.** Tu peux les garder comme extensions et indiquer clairement leur rôle.
+
+## 🧭 Architecture
 
 ```text
 Fichiers CSV Synthea
         ↓
-Google Cloud Storage — zone raw
+Cloud Storage — zone raw
         ↓
-Kestra — orchestration et suivi
+Dataproc Serverless — jobs PySpark batch
         ↓
-Dataproc Serverless — traitements PySpark batch
-        ↓
-Google Cloud Storage — fichiers préparés en Parquet
+Cloud Storage — données préparées en Parquet
         ↓
 BigQuery — tables de staging
         ↓
-dbt Fusion exécuté localement — modèles et tests
+dbt Fusion local — modèles SQL et tests (extension)
         ↓
 BigQuery — tables analytiques
-        ↓
-Requêtes ou tableau de bord
 ```
 
-Dataproc Serverless exécute des traitements Spark batch sans que tu aies à créer ou gérer un cluster Spark permanent. PySpark peut être soumis comme un workload batch. ([docs.cloud.google.com](https://docs.cloud.google.com/managed-spark/docs/serverless-overview?trk=article-ssr-frontend-pulse_little-text-block&utm_source=openai))
+Kestra peut déclencher et suivre le traitement, mais son ajout ne remplace pas les services Google Cloud étudiés.
 
-> **Point important :** Kestra orchestre la partie cloud ; dbt Fusion reste exécuté localement dans la première version. Après le flow Kestra, tu vérifies les tables de staging, puis tu lances dbt depuis ton environnement local. Pour automatiser dbt plus tard, il faudra lui fournir un environnement d’exécution et des identifiants GCP accessibles.
+## 📥 Données à récupérer
 
----
+Synthea produit des dossiers médicaux **synthétiques**, et non des dossiers de vrais patients. Pour une première version, récupère un jeu d’exemple CSV sur le site officiel ou génère un jeu toi-même avec le projet Synthea. Vérifie les fichiers et leurs colonnes avant de définir les schémas BigQuery.
 
-## 🔗 Récupération des données Synthea
+**Sources officielles :**
 
-Synthea est un générateur de dossiers médicaux synthétiques. Pour commencer, utilise un jeu d’exemple au format CSV, ou génère tes propres données.
+- [Téléchargements Synthea](https://synthetichealth.github.io/downloads.html)
+- [Projet Synthea sur GitHub](https://github.com/synthetichealth/synthea)
 
-| Ressource | Lien | Utilisation |
-|---|---|---|
-| **Téléchargements Synthea** | [synthetichealth.github.io/downloads](https://synthetichealth.github.io/downloads.html) | Récupérer un jeu d’exemple |
-| **Site officiel Synthea** | [synthetichealth.github.io/synthea](https://synthetichealth.github.io/synthea/) | Consulter le projet et ses données |
-| **Dépôt GitHub** | [github.com/synthetichealth/synthea](https://github.com/synthetichealth/synthea) | Générer des données et consulter les instructions |
-
-Pour la première version, récupère ces fichiers :
+Commence avec ces trois fichiers :
 
 | Fichier | Utilisation |
 |---|---|
-| `patients.csv` | Dimension patients, tranches d’âge et données démographiques disponibles |
-| `encounters.csv` | Analyses des rencontres médicales par période ou type |
-| `conditions.csv` | Indicateurs de conditions par patient ou rencontre |
+| `patients.csv` | Patients et analyses démographiques |
+| `encounters.csv` | Rencontres médicales et analyses par période |
+| `conditions.csv` | Conditions médicales et analyses par groupe démographique |
 
-Tu pourras ajouter ensuite `observations.csv`, `medications.csv`, `procedures.csv`, `organizations.csv` ou `providers.csv`.
-
-**Avant de fixer les schémas**, inspecte les en-têtes et les types des fichiers réellement téléchargés : le contenu peut varier selon le jeu et sa configuration.
-
-> Ces données sont synthétiques. Le projet démontre des compétences techniques, pas une analyse médicale d’une population réelle.
-
----
-
-## 📊 Périmètre des données
-
-| Domaine | Indicateurs envisagés | Grain à confirmer | Points d’attention |
-|---|---|---|---|
-| **Patients** | Nombre de patients, tranches d’âge, répartition géographique si disponible | Patient | Vérifier les champs, les dates et les valeurs manquantes |
-| **Rencontres** | Rencontres par période ou type | Rencontre | Vérifier les dates et les identifiants |
-| **Conditions** | Conditions par groupe démographique | Condition associée à un patient ou à une rencontre | Vérifier les relations et identifiants réellement disponibles |
-
-Ne crée une relation entre les tables que si les clés sont présentes et cohérentes dans les fichiers.
-
----
+Les fichiers disponibles et leurs colonnes peuvent varier selon le jeu et la configuration. Contrôle les en-têtes des CSV téléchargés avant de construire le pipeline.
 
 ## 🔄 Étapes du pipeline
 
-### 1. Récupération et inspection
+1. Télécharger ou générer les fichiers CSV Synthea.
+2. Vérifier la présence des fichiers, leurs en-têtes et les colonnes attendues.
+3. Déposer les fichiers bruts dans un bucket GCS.
+4. Lancer les jobs PySpark sur Dataproc Serverless.
+5. Contrôler les types, les valeurs manquantes, les doublons et les règles de qualité.
+6. Écrire les fichiers préparés en Parquet dans une zone GCS `curated/`.
+7. Charger les données préparées dans les tables de staging BigQuery.
+8. Exécuter **localement**, si tu conserves cette extension, dbt Fusion pour créer les modèles et lancer les tests.
+9. Consulter les résultats, les journaux et les volumes traités.
 
-Télécharger un jeu CSV Synthea ou générer des données. Commencer avec `patients.csv`, `encounters.csv` et `conditions.csv`, puis inspecter leurs colonnes.
+## 📊 Analyses à présenter
 
-### 2. Dépôt des fichiers dans GCS
+- Nombre de patients par tranche d’âge ou région, si les champs le permettent.
+- Nombre de rencontres médicales par période.
+- Principales conditions médicales par groupe démographique.
+- Nombre de doublons et de champs manquants.
+- Volumes avant et après nettoyage.
+- Lignes traitées ou rejetées et erreurs rencontrées.
 
-Conserver les fichiers d’origine dans une zone brute :
+Les résultats sont des analyses de **données synthétiques** : ils ne décrivent pas une population réelle.
 
-```text
-gs://<bucket-synthea>/raw/patients/patients.csv
-gs://<bucket-synthea>/raw/encounters/encounters.csv
-gs://<bucket-synthea>/raw/conditions/conditions.csv
-```
+## 🧪 Qualité et sécurité
 
-### 3. Validation des entrées avec Kestra
+- Vérifier les colonnes obligatoires et leurs types.
+- Tester l’unicité des clés lorsque le grain des données s’y prête.
+- Comparer les volumes source et les volumes traités.
+- Documenter les lignes rejetées plutôt que de les supprimer sans suivi.
+- Ne jamais versionner de clé de compte de service ni de secret.
+- Donner aux identités utilisées uniquement les permissions GCP nécessaires.
 
-Vérifier la présence des fichiers, leur format, leurs en-têtes et les colonnes nécessaires aux transformations.
-
-### 4. Traitements PySpark sur Dataproc Serverless
-
-Exécuter des traitements batch pour :
-
-- convertir explicitement les types ;
-- mesurer les valeurs manquantes ;
-- détecter les doublons ;
-- vérifier les clés utilisées pour les relations ;
-- comparer les volumes avant et après traitement.
-
-### 5. Écriture en Parquet dans GCS
-
-Écrire les fichiers préparés dans une zone distincte :
-
-```text
-gs://<bucket-synthea>/curated/patients/
-gs://<bucket-synthea>/curated/encounters/
-gs://<bucket-synthea>/curated/conditions/
-```
-
-### 6. Chargement des tables de staging BigQuery
-
-Charger les fichiers préparés dans des tables BigQuery de staging. Le connecteur Spark-BigQuery peut aussi être utilisé par les traitements Spark si tu choisis une écriture directe depuis Dataproc ; documente alors les fichiers temporaires et le mécanisme d’écriture retenu. ([docs.cloud.google.com](https://docs.cloud.google.com/managed-spark/docs/guides/spark-bigquery-connector?utm_source=openai))
-
-### 7. Modélisation avec dbt Fusion
-
-Exécuter dbt Fusion localement pour créer les modèles et lancer les tests sur BigQuery.
-
-### 8. Vérification des résultats
-
-Consulter les exécutions Kestra, les logs Dataproc, les volumes chargés et les résultats des tests dbt.
-
----
-
-## 🧱 Modèles dbt proposés
-
-```text
-dbt/
-├── dbt_project.yml
-├── models/
-│   ├── staging/
-│   │   ├── stg_patients.sql
-│   │   ├── stg_encounters.sql
-│   │   └── stg_conditions.sql
-│   └── marts/
-│       ├── dim_patients.sql
-│       ├── fact_encounters.sql
-│       └── condition_indicators.sql
-└── tests/
-```
-
-Prévois des tests adaptés aux colonnes réellement disponibles : non-nullité, unicité lorsque le grain la justifie, relations entre tables et valeurs acceptées.
-
----
-
-## 🧰 Rôle des composants
-
-| Composant | Rôle |
-|---|---|
-| **Kestra** | Orchestre les tâches, validations, soumissions de jobs et reprises. |
-| **Docker Compose** | Lance Kestra localement pour le développement. |
-| **Dataproc Serverless** | Exécute les jobs PySpark batch. |
-| **GCS** | Stocke les fichiers bruts et les résultats Parquet. |
-| **BigQuery** | Héberge les tables de staging et analytiques. |
-| **dbt Fusion** | S’exécute localement et transforme les données directement dans BigQuery. |
-
-Docker Compose ne lance pas Dataproc : il sert à l’environnement local de Kestra.
-
----
-
-## 🧪 Contrôles de qualité et analyses
-
-- Nombre de patients par tranche d’âge.
-- Rencontres médicales par période ou type.
-- Conditions par groupe démographique, si les champs le permettent.
-- Valeurs manquantes et doublons par table.
-- Volumes d’entrée et de sortie de chaque traitement.
-- Tests dbt sur les clés, relations et champs obligatoires.
-
----
-
-## ☁️ Configuration GCP et sécurité
-
-Datasets suggérés :
-
-| Dataset BigQuery | Contenu |
-|---|---|
-| `synthea_staging` | Tables chargées à partir des fichiers préparés |
-| `synthea_mart` | Dimensions, faits et indicateurs dbt |
-
-Configure les permissions minimales nécessaires pour lire et écrire dans GCS, soumettre des traitements Dataproc et créer ou interroger les tables BigQuery. Ne versionne aucune clé JSON, aucun mot de passe ni secret.
-
----
-
-## 📁 Structure du dépôt
+## 📁 Organisation du dépôt
 
 ```text
 01-synthea-gcp-batch-pipeline/
 ├── README.md
+├── docker-compose.yml               # Kestra local, si conservé
 ├── .gitignore
 ├── .env.example
-├── docker-compose.yml
 ├── kestra/
 │   └── flows/
-│       └── synthea_pipeline.yml
 ├── spark/
 │   └── jobs/
 │       ├── clean_patients.py
 │       ├── prepare_encounters.py
 │       └── prepare_conditions.py
-├── dbt/
+├── dbt/                              # extension : dbt Fusion local
 │   ├── dbt_project.yml
 │   ├── models/
-│   │   ├── staging/
-│   │   └── marts/
 │   └── tests/
 ├── tests/
 └── docs/
     ├── architecture.md
-    ├── data_dictionary.md
-    └── data_quality.md
+    └── data_dictionary.md
 ```
 
----
+## ✅ Livrables portfolio
 
-## ✅ Checklist de livraison
-
-- [ ] Récupérer ou générer les fichiers CSV Synthea.
-- [ ] Vérifier les colonnes réellement présentes.
-- [ ] Déposer les fichiers bruts dans GCS.
-- [ ] Exécuter les contrôles d’entrée Kestra.
-- [ ] Soumettre les jobs PySpark à Dataproc Serverless.
-- [ ] Écrire les résultats préparés en Parquet.
-- [ ] Charger les tables de staging BigQuery.
-- [ ] Exécuter dbt Fusion localement et vérifier ses tests.
-- [ ] Documenter les volumes, erreurs, coûts et limites.
-- [ ] Garder tous les secrets hors du dépôt.
-
----
+- Dépôt Git avec les jobs PySpark, les configurations et, si utilisé, les flows Kestra.
+- README expliquant l’architecture, les données Synthea, les étapes et les choix techniques.
+- Schéma du pipeline.
+- Résultats de contrôles de qualité.
+- Exemples de requêtes BigQuery ou petit tableau de bord.
+- Captures Kestra si tu utilises Kestra.
+- Modèles et résultats de tests dbt si tu utilises dbt Fusion.
 
 ## 📌 Positionnement
 
-Ce projet est une bonne réalisation pratique pour la partie **batch** du parcours Google Cloud Data Engineer : il met en œuvre du stockage, du traitement Spark sur Dataproc, BigQuery, la qualité des données et l’orchestration.
-
-Il ne faut cependant pas le présenter comme une reproduction complète du programme officiel : le parcours couvre aussi d’autres paradigmes et services, notamment Dataflow et le streaming. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?utm_source=openai))
+Ce projet démontre surtout tes compétences **batch** : données en fichiers, stockage GCS, traitement Spark sur Dataproc et analyse dans BigQuery. Garde Kestra et dbt Fusion comme des extensions clairement identifiées, et non comme des prérequis du cours.
 
 ---
 
 # 📋 PROJET 2 — PIPELINE STREAMING
 
-## ⚡ Synthetic Health Events Pipeline — Pub/Sub, Dataflow et BigQuery
+## 📡 Synthetic Health Events Pipeline — Pub/Sub, Dataflow et BigQuery
 
 | | |
 |:---|:---|
-| **📂 Repo** | `DEHUB/02-synthetic-health-streaming-pipeline/` |
+| **📂 Repo** | `DEHUB/02-synthea-gcp-streaming-pipeline/` |
 | **☁️ Projet GCP** | `note` — ton projet Google Cloud principal |
-| **🎯 Objectif** | Construire un pipeline streaming de démonstration à partir d’événements synthétiques |
-| **🧰 Technologies** | Pub/Sub, Dataflow, BigQuery ; dbt Fusion local en option |
-
----
+| **🎯 Objectif** | Construire un pipeline de démonstration qui traite des événements synthétiques au fil de leur arrivée |
+| **🧰 Technologies principales** | Pub/Sub, Dataflow, Apache Beam et BigQuery |
+| **🧰 Extension portfolio** | dbt Fusion local, facultatif, pour des modèles analytiques supplémentaires |
 
 ## 💡 Pitch recruteur
 
-> « J’ai construit un pipeline streaming de démonstration à partir d’événements entièrement synthétiques. Les événements sont publiés dans Pub/Sub, validés et traités par Dataflow, puis stockés dans BigQuery. J’ai mesuré les événements reçus, traités et rejetés, et documenté les choix de fiabilité, de latence, de sécurité et de coût. »
+> « J’ai développé un pipeline streaming de démonstration. Un générateur produit des événements synthétiques, Pub/Sub les transporte, et Dataflow les valide, les transforme et les écrit dans BigQuery. J’ai ajouté des contrôles sur les événements invalides, les doublons et les volumes afin d’illustrer le suivi et la fiabilité du pipeline. »
 
----
+## 🎓 Lien avec le parcours Data Engineer
 
-## 🧭 Architecture sur GCP (`note`)
+Ce projet correspond aux sujets du cours **Building Resilient Streaming Analytics Systems on Google Cloud** : traiter et agréger des flux avec Dataflow, puis stocker les résultats dans BigQuery pour l’analyse. Le cours officiel décrit ce type de chaîne streaming. ([cloud.google.com](https://cloud.google.com/blog/topics/training-certifications/google-clouds-data-engineering-learning-path-is-now-updated?utm_source=openai))
+
+Il complète le cours **Serverless Data Processing with Dataflow** et le projet batch en mettant l’accent sur des événements traités à mesure qu’ils arrivent. Le parcours Data Engineer liste ces cours dans son offre actuelle. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?authuser=117&utm_source=openai))
+
+## 🧭 Architecture
 
 ```text
 Générateur d’événements synthétiques
         ↓
-Pub/Sub — ingestion des messages
+Pub/Sub — réception des messages
         ↓
-Dataflow — validation et traitement streaming
+Dataflow / Apache Beam — validation et transformation
         ↓
-BigQuery — événements traités
+ ┌─────────────────────┴────────────────────┐
+ ↓                                          ↓
+BigQuery — événements valides       Sortie de rejet / erreurs
         ↓
-Requêtes analytiques ou tableau de bord
-
-Événements invalides
-        ↓
-Table ou sortie de quarantaine pour diagnostic
+Requêtes et tableaux de bord
 ```
 
-Google fournit un modèle Dataflow qui lit des messages JSON depuis Pub/Sub et les écrit dans BigQuery. Pour aller au-delà d’une démonstration d’intégration, tu peux aussi développer un pipeline Dataflow personnalisé qui implémente tes validations et transformations. ([docs.cloud.google.com](https://docs.cloud.google.com/dataflow/docs/guides/templates/provided/pubsub-to-bigquery?utm_source=openai))
+Le générateur est une source de test : **ce n’est pas une source de données de santé réelles**.
 
----
+## 📨 Événements à générer
 
-## 🎯 Objectif
+Définis un schéma JSON simple et documenté, par exemple :
 
-Compléter le projet batch par un flux d’événements continus. Le premier projet traite des fichiers ; celui-ci traite des événements au fil de leur arrivée.
+- identifiant d’événement ;
+- type d’événement ;
+- identifiant patient synthétique ;
+- horodatage de création ;
+- attributs propres au type d’événement.
 
-Tous les événements doivent être artificiels : aucun dossier réel ni aucune donnée réelle de patient ne doit être utilisé.
-
----
-
-## 📥 Événements synthétiques
-
-Définis un schéma simple et documenté, par exemple :
-
-| Événement fictif | Usage |
-|---|---|
-| Rencontre créée | Suivre les nouvelles rencontres dans le flux |
-| Observation ajoutée | Tester le traitement d’un événement contenant une mesure synthétique |
-| Statut modifié | Démontrer le traitement d’une mise à jour |
-| Événement invalide | Tester la validation et la sortie d’erreurs |
-
-Documente les champs obligatoires, les types et les règles de validation.
-
----
+Ne publie pas d’informations personnelles réelles. Les identifiants et valeurs doivent être générés pour la démonstration.
 
 ## 🔄 Étapes du pipeline
 
-### 1. Définir le schéma
-
-Préciser les champs de l’événement, les identifiants, les horodatages et les règles de validation.
-
-### 2. Générer les événements
-
-Créer un générateur qui produit des messages synthétiques à un rythme réglable. Inclure quelques messages invalides pour tester les contrôles.
-
-### 3. Publier dans Pub/Sub
-
-Envoyer les messages dans un topic Pub/Sub. Documenter le compte utilisé, les accès et la manière de relancer le générateur.
-
-### 4. Traiter avec Dataflow
-
-Valider le schéma, transformer les événements conformes, et envoyer les événements rejetés vers une sortie prévue pour le diagnostic.
-
-### 5. Écrire dans BigQuery
-
-Stocker séparément, si possible, les événements traités et les erreurs. Le template officiel Pub/Sub-to-BigQuery prévoit également une table de sortie pour certains messages en erreur ; vérifie si ses paramètres répondent à tes besoins avant de l’utiliser. ([docs.cloud.google.com](https://docs.cloud.google.com/dataflow/docs/guides/templates/provided/pubsub-to-bigquery?utm_source=openai))
-
-### 6. Tester la fiabilité
-
-Tester les erreurs, les événements dupliqués et les reprises. Documenter le mode de livraison choisi : selon la configuration, il peut y avoir des compromis entre coût, latence et risque de doublons. ([docs.cloud.google.com](https://docs.cloud.google.com/dataflow/docs/guides/streaming-modes?utm_source=openai))
-
----
+1. Définir le schéma des événements et les règles de validation.
+2. Générer des événements synthétiques valides et invalides.
+3. Publier les messages valides et invalides dans Pub/Sub.
+4. Traiter le flux avec Dataflow et Apache Beam.
+5. Valider les champs obligatoires, les types et les horodatages.
+6. Écrire les événements valides dans BigQuery.
+7. Séparer ou signaler les messages invalides pour les inspecter.
+8. Comparer les volumes publiés, traités, rejetés et écrits.
+9. Tester les doublons, les erreurs et le redémarrage du traitement.
 
 ## 📊 Analyses à présenter
 
-- Événements reçus, traités et rejetés.
-- Événements par type et par période.
+- Nombre d’événements par type et par période.
+- Volumes reçus, traités et rejetés.
+- Répartition des erreurs de validation.
 - Doublons détectés.
-- Délai entre création et traitement, si les horodatages le permettent.
-- Erreurs de validation et résultats des reprises.
+- Délai entre émission et traitement, si les horodatages le permettent.
+- Indicateurs d’exécution et coûts de la démonstration.
 
-Ces résultats décrivent le fonctionnement du pipeline, pas une activité de santé réelle.
+## 🧪 Qualité et fiabilité
 
----
+- Vérifier que les champs obligatoires sont présents.
+- Contrôler le format et la validité des horodatages.
+- Documenter le traitement des messages invalides.
+- Tester des événements dupliqués et des événements arrivant en retard.
+- Comparer le nombre de messages publiés et les sorties BigQuery.
+- Documenter les limites, la supervision et les hypothèses de coût.
 
-## 🧪 Tests et supervision
-
-- Champs obligatoires et formats valides.
-- Nombre de messages reçus et écrits.
-- Suivi des événements rejetés.
-- Test d’une interruption ou d’une erreur, puis reprise.
-- Surveillance de la durée d’exécution et des coûts.
-- Vérification que les événements peuvent être analysés dans BigQuery.
-
----
-
-## 🧰 Rôle des composants
-
-| Composant | Rôle |
-|---|---|
-| **Générateur** | Produit des événements fictifs de façon contrôlée. |
-| **Pub/Sub** | Reçoit et distribue les messages. |
-| **Dataflow** | Traite le flux, valide les événements et écrit les résultats. |
-| **BigQuery** | Stocke les événements traités pour les requêtes. |
-| **dbt Fusion, en option** | Construit localement des modèles analytiques supplémentaires dans BigQuery. |
-
----
-
-## 📁 Structure du dépôt
+## 📁 Organisation du dépôt
 
 ```text
-02-synthetic-health-streaming-pipeline/
+02-synthea-gcp-streaming-pipeline/
 ├── README.md
 ├── .gitignore
 ├── .env.example
@@ -396,7 +236,7 @@ Ces résultats décrivent le fonctionnement du pipeline, pas une activité de sa
 ├── dataflow/
 │   ├── pipeline/
 │   └── tests/
-├── dbt/                         # optionnel
+├── dbt/                              # extension facultative
 │   ├── dbt_project.yml
 │   ├── models/
 │   └── tests/
@@ -407,23 +247,15 @@ Ces résultats décrivent le fonctionnement du pipeline, pas une activité de sa
 └── tests/
 ```
 
----
+## ✅ Livrables portfolio
 
-## ✅ Checklist de livraison
-
-- [ ] Schéma d’événement défini.
-- [ ] Générateur synthétique fonctionnel.
-- [ ] Messages publiés dans Pub/Sub.
-- [ ] Traitement Dataflow validé.
-- [ ] Événements traités consultables dans BigQuery.
-- [ ] Événements invalides suivis séparément.
-- [ ] Doublons, erreurs et reprises testés.
-- [ ] Sécurité, supervision et coûts documentés.
-- [ ] Secrets absents du dépôt.
-- [ ] README et diagramme d’architecture ajoutés.
-
----
+- Dépôt Git avec le générateur, le pipeline Dataflow et les tests.
+- README avec le schéma d’événement, les étapes de déploiement et les choix d’architecture.
+- Diagramme Pub/Sub → Dataflow → BigQuery.
+- Exemples de requêtes BigQuery et résultats de contrôles.
+- Description du traitement des erreurs, des doublons et des reprises.
+- Captures ou journaux de démonstration, sans secrets ni données sensibles.
 
 ## 📌 Positionnement
 
-Ce projet complète le projet batch en couvrant la partie **streaming** du parcours. Il te permet d’illustrer Pub/Sub, Dataflow, BigQuery, le traitement des événements, les erreurs et les compromis de fiabilité. Le parcours Google Cloud distingue bien le traitement batch du streaming et associe Dataflow à la construction de pipelines de traitement. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?utm_source=openai))
+Ce projet démontre le volet **streaming** du parcours : Pub/Sub pour l’ingestion, Dataflow pour le traitement et BigQuery pour l’analyse. Le projet 1 couvre le batch avec Dataproc et PySpark ; les deux projets sont donc complémentaires plutôt que redondants. ([cloud.google.com](https://cloud.google.com/learn/training/data-engineering-and-analytics?authuser=117&utm_source=openai))
